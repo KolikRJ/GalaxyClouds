@@ -14,6 +14,9 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
 
+import ru.kolik.util.CloudClientUtils;
+import ru.kolik.util.StandartCloudCommand;
+
 public class MyWatchService {
 	
 	private WatchService watch;
@@ -23,7 +26,7 @@ public class MyWatchService {
 	public MyWatchService() throws IOException, InterruptedException {
 		watch = FileSystems.getDefault().newWatchService();
 		keys = new HashMap<WatchKey, Path>();
-		walkAndRegisterDir(CloudCommand.getCloudDirectory());
+		walkAndRegisterDir(CloudClientUtils.getCloudDirectory());
 	}
 	
 	private void registerDir(Path dir) throws IOException {
@@ -36,8 +39,6 @@ public class MyWatchService {
 			
 			@Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-				sizeDir += attrs.size();
-				System.out.println("files");
 				return FileVisitResult.CONTINUE;
 			}
 			
@@ -47,23 +48,22 @@ public class MyWatchService {
 				return FileVisitResult.CONTINUE;
 			}
 		});
-		System.out.println(sizeDir);
 	}
 	
 	private void create(Path child) {
 		if (Files.isDirectory(child))
-			CloudCommand.addTasks(StandartCloudCommand.CREATE_DIRECTORY, child);
+			CloudClientUtils.addTasks(StandartCloudCommand.CREATE_DIRECTORY, child);
 		else
-			CloudCommand.addTasks(StandartCloudCommand.CREATE_FILE, child);
+			CloudClientUtils.addTasks(StandartCloudCommand.CREATE_FILE, child);
 	}
 	
 	private void delete(Path child) {
-		CloudCommand.addTasks(StandartCloudCommand.DELETE_DIRECTORY, child);
+		CloudClientUtils.addTasks(StandartCloudCommand.DELETE, child);
 	}
 	
 	private void update(Path child) {
 		if (Files.isRegularFile(child))
-			CloudCommand.addTasks(StandartCloudCommand.UPDATE_FILE, child);
+			CloudClientUtils.addTasks(StandartCloudCommand.UPDATE_FILE, child);
 	}
 	
 	public void startService() {
@@ -75,16 +75,14 @@ public class MyWatchService {
 					Path child = dir.resolve(event.context().toString());
 					switch (event.kind().name()) {
 					case "ENTRY_CREATE":
-						// create(child);
-						System.out.println("create " + child);
+						create(child);
+						walkAndRegisterDir(child);
 						break;
 					case "ENTRY_DELETE":
-						// delete(child);
-						System.out.println("delete " + child);
+						delete(child);
 						break;
 					case "ENTRY_MODIFY":
-						// update(child);
-						System.out.println("update " + child);
+						update(child);
 						break;
 					}
 				}
@@ -95,6 +93,8 @@ public class MyWatchService {
 					break;
 			}
 		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
